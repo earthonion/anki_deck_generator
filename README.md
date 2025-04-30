@@ -16,7 +16,8 @@ It automates the creation of rich Anki decks with:
 1. **Download Frequency List**  
    Run `dl_freq.py` to download a frequency dictionary from Wiktionary.  
    You can update the script or URL to customize the word list.
-   https://en.m.wiktionary.org/wiki/User:Matthias_Buchmeier/
+   you can browse frequency lists here:
+   https://en.m.wiktionary.org/wiki/User:Matthias_Buchmeier
 
 3. **Generate Translations**  
    Run `mk_ai_deck.py` to create a CSV with:
