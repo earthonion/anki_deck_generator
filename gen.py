@@ -183,7 +183,7 @@ def generate_audio_and_images_for_spanish(input_file, openai_api_key=None, org_i
                     print(f"  Error generating audio for example '{data['spanish_example']}': {e}")
         
         # 3. Generate image for the word
-        image_filename = f"anki_{word_safe}.jpg"
+        image_filename = f"image_{word_safe}.jpg"
         image_path = media_dir / image_filename
         
         # Check if image already exists
@@ -359,14 +359,45 @@ def generate_image(prompt, output_path, api_key, org_id=None):
         return False
 
 def sanitize_filename(filename):
-    """Create a valid filename from text"""
-    # Replace invalid characters
+    """
+    Create a valid filename from text that preserves Spanish accents as Unicode code points
+    to maintain uniqueness between similar words with different accents.
+    """
+    # Base set of valid characters for filenames
     valid_chars = "-_.() abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    sanitized = ''.join(c for c in filename if c in valid_chars)
+    
+    # Store special characters with their Unicode code points
+    special_chars = []
+    for i, char in enumerate(filename):
+        if char not in valid_chars:
+            # Store position and Unicode code point
+            special_chars.append((i, ord(char)))
+    
+    # Create a base sanitized name using only valid characters
+    base_name = ''.join(c for c in filename if c in valid_chars)
+    
     # Replace spaces with underscores
-    sanitized = sanitized.replace(' ', '_')
-    # Limit length and trim
-    return sanitized[:50].strip()
+    base_name = base_name.replace(' ', '_')
+    
+    # If we had special characters, append their information to the filename
+    if special_chars:
+        # Create a suffix with position and code point information
+        # Format: _p1c233_p3c225 (position 1, code 233; position 3, code 225)
+        suffix = ""
+        for pos, code in special_chars:
+            suffix += f"_p{pos}c{code}"
+        
+        # Ensure we have room for the suffix (limit base name if needed)
+        max_base_length = 40  # Allow up to 10 characters for the suffix
+        if len(base_name) > max_base_length:
+            base_name = base_name[:max_base_length]
+        
+        result = base_name + suffix
+    else:
+        # No special characters, just limit length
+        result = base_name[:50]
+    
+    return result.strip()
 
 def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, output_file, media_dir):
     """Create an Anki deck with audio files and images"""
@@ -391,12 +422,12 @@ def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, 
                 'qfmt': '''
                 {{WordAudio}}
                 <div style="font-size: 28px; text-align: center; color: #2563eb; font-weight: bold; margin-bottom: 15px;">{{Spanish}}</div>
-                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;"><img src="{{Image}}" style="max-width: 300px; max-height: 300px;"></div>{{/Image}}
+                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;">{{Image}}</div>{{/Image}}
                 ''',
                 'afmt': '''
                 {{WordAudio}}
                 <div style="font-size: 28px; text-align: center; color: #2563eb; font-weight: bold; margin-bottom: 15px;">{{Spanish}}</div>
-                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;"><img src="{{Image}}" style="max-width: 300px; max-height: 300px;"></div>{{/Image}}
+                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;">{{Image}}</div>{{/Image}}
                 <hr id="answer">
                 <div style="font-size: 24px; text-align: center; color: #059669;">{{English}}</div>
                 {{#SpanishExample}}
@@ -417,7 +448,7 @@ def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, 
                 <hr id="answer">
                 {{WordAudio}}
                 <div style="font-size: 28px; text-align: center; color: #2563eb; font-weight: bold; margin-bottom: 15px;">{{Spanish}}</div>
-                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;"><img src="{{Image}}" style="max-width: 300px; max-height: 300px;"></div>{{/Image}}
+                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;">{{Image}}</div>{{/Image}}
                 {{#SpanishExample}}
                 <div style="margin-top: 20px; font-size: 20px; text-align: center; color: #6366f1; font-style: italic;">
                     {{ExampleAudio}}{{SpanishExample}}
@@ -481,7 +512,7 @@ def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, 
                 data['english_example'],
                 word_audio_tag,
                 example_audio_tag,
-                image
+                f'<img src="{image}" style="max-width: 300px; max-height: 300px;">'
             ]
         )
         
