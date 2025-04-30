@@ -1,15 +1,38 @@
-# anki deck generator 
-this was created for learning Spanish, however it can be applied to other languages easily.
+# Anki Deck Generator
 
-first run dl_freq.py to download the frequency dictionary from wiktionary. update this code (or the URL) to create the list of words
+This tool was originally created for learning Spanish but can be easily adapted for other languages.
 
+## Overview
 
-then run mk_ai_deck.py this will create a csv with translations to English with example sentences
+It automates the creation of rich Anki decks with:
 
+- Word translations  
+- Example sentences  
+- Audio pronunciation  
+- AI-generated images  
 
-then run gen.py  this will generate the audio for the word, examples, and photos for the image. you will need an openai API key. to use the latest image generation model you will need to have your account approved. 
+## Usage
 
-be careful this is very expensive!
+1. **Download Frequency List**  
+   Run `dl_freq.py` to download a frequency dictionary from Wiktionary.  
+   You can update the script or URL to customize the word list.
 
-gen.py also creates the apkg file to be imported into anki. which i have provided in the releases section.
+2. **Generate Translations**  
+   Run `mk_ai_deck.py` to create a CSV with:
+   - English translations
+   - Example sentences
 
+3. **Generate Media & Anki Deck**  
+   Run `gen.py` to:
+   - Generate audio (word and examples)  
+   - Generate images for each word (requires OpenAI API access)  
+   - Compile everything into an `.apkg` file
+
+   **Note:**  
+   - You’ll need a valid OpenAI API key.  
+   - Image generation (especially using DALL·E 3) requires account approval.  
+   - **This step can become expensive—use with caution.**
+
+## Prebuilt Decks
+
+Prebuilt `.apkg` decks are available in the [Releases](../../releases) section.
