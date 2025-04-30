@@ -16,13 +16,14 @@ It automates the creation of rich Anki decks with:
 1. **Download Frequency List**  
    Run `dl_freq.py` to download a frequency dictionary from Wiktionary.  
    You can update the script or URL to customize the word list.
+   https://en.m.wiktionary.org/wiki/User:Matthias_Buchmeier/
 
-2. **Generate Translations**  
+3. **Generate Translations**  
    Run `mk_ai_deck.py` to create a CSV with:
    - English translations
    - Example sentences
 
-3. **Generate Media & Anki Deck**  
+4. **Generate Media & Anki Deck**  
    Run `gen.py` to:
    - Generate audio (word and examples)  
    - Generate images for each word (requires OpenAI API access)  
