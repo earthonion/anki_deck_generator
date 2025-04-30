@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Spanish Audio & Image Flashcards Generator
-With support for local image generation and word-based file naming
+With support for local image generation via --local flag
 """
 
 import csv
@@ -15,7 +15,6 @@ from gtts import gTTS
 import genanki
 import base64
 import json
-import random
 
 def generate_audio_and_images_for_spanish(input_file, openai_api_key=None, org_id=None, use_local_gen=False):
     """
@@ -127,43 +126,35 @@ def generate_audio_and_images_for_spanish(input_file, openai_api_key=None, org_i
     # Generate audio files and images
     audio_files = {}
     image_files = {}
-    count = 0
-    total = len(data_rows)
-    for data in data_rows:
-        count += 1
-        spanish_word = data['spanish']
-        print(f"Processing: {spanish_word}")
-        print(f"Completed: {count}/{total}")
-        
-        # Use sanitized word for filenames
-        word_safe = sanitize_filename(spanish_word)
+    
+    for i, data in enumerate(data_rows):
+        print(f"Processing {i+1}/{len(data_rows)}: {data['spanish']}")
         
         # 1. Generate audio for Spanish word
-        word_filename = f"word_{word_safe}.mp3"
+        word_filename = f"word_{i}_{sanitize_filename(data['spanish'])}.mp3"
         word_path = media_dir / word_filename
         
         # Check if audio file already exists
         if word_path.exists():
             print(f"  Audio for word already exists, skipping generation")
-            audio_files[spanish_word] = word_filename
+            audio_files[data['spanish']] = word_filename
         else:
             try:
                 if openai_api_key:
                     # Use OpenAI TTS API if key is provided
-                    generate_openai_tts(spanish_word, word_path, openai_api_key)
+                    generate_openai_tts(data['spanish'], word_path, openai_api_key)
                 else:
                     # Fall back to gTTS
-                    generate_gtts(spanish_word, word_path, lang='es')
+                    generate_gtts(data['spanish'], word_path, lang='es')
                     
-                audio_files[spanish_word] = word_filename
+                audio_files[data['spanish']] = word_filename
                 print(f"  Word audio generated successfully")
             except Exception as e:
-                print(f"  Error generating audio for word '{spanish_word}': {e}")
+                print(f"  Error generating audio for word '{data['spanish']}': {e}")
         
         # 2. Generate audio for Spanish example if available
         if data['spanish_example']:
-            # Use sanitized word for consistency, not the whole example
-            example_filename = f"example_{word_safe}.mp3"
+            example_filename = f"example_{i}_{sanitize_filename(data['spanish'])}.mp3"
             example_path = media_dir / example_filename
             
             # Check if example audio file already exists
@@ -183,42 +174,43 @@ def generate_audio_and_images_for_spanish(input_file, openai_api_key=None, org_i
                     print(f"  Error generating audio for example '{data['spanish_example']}': {e}")
         
         # 3. Generate image for the word
-        image_filename = f"image_{word_safe}.jpg"
+        image_filename = f"image_{i}_{sanitize_filename(data['spanish'])}.jpg"
         image_path = media_dir / image_filename
         
         # Check if image already exists
         if image_path.exists():
             print(f"  Image already exists, skipping generation")
-            image_files[spanish_word] = image_filename
+            image_files[data['spanish']] = image_filename
         elif use_local_gen and local_generator:
             # Use local image generator
             try:
                 # Generate image prompt
-                prompt = local_generator.generate_image_prompt(spanish_word, data['english'])
+                prompt = local_generator.generate_image_prompt(data['spanish'], data['english'])
                 print(f"  Image prompt: {prompt}")
                 
                 # Generate the image using local generator
                 local_generator.generate_image(prompt, image_path)
-                image_files[spanish_word] = image_filename
+                image_files[data['spanish']] = image_filename
                 print(f"  Image generated successfully using local generator")
             except Exception as e:
-                print(f"  Error generating image locally for '{spanish_word}': {e}")
+                print(f"  Error generating image locally for '{data['spanish']}': {e}")
         elif openai_api_key:
             # Use OpenAI for image generation
             try:
                 # Generate image prompt using the word and its definition
-                prompt = generate_image_prompt(spanish_word, data['english'], openai_api_key, org_id)
+                prompt = generate_image_prompt(data['spanish'], data['english'], openai_api_key, org_id)
                 print(f"  Image prompt: {prompt}")
                 
                 # Generate the image using OpenAI
                 generate_image(prompt, image_path, openai_api_key, org_id)
-                image_files[spanish_word] = image_filename
+                image_files[data['spanish']] = image_filename
                 print(f"  Image generated successfully with OpenAI")
             except Exception as e:
-                print(f"  Error generating image with OpenAI for '{spanish_word}': {e}")
+                print(f"  Error generating image with OpenAI for '{data['spanish']}': {e}")
         
         # Add a small delay to avoid rate limits
-        #time.sleep(0.5)
+       # if not use_local_gen:
+#        time.sleep(0.5)
     
     # Clean up local generator if used
     if use_local_gen and local_generator:
@@ -359,45 +351,12 @@ def generate_image(prompt, output_path, api_key, org_id=None):
         return False
 
 def sanitize_filename(filename):
-    """
-    Create a valid filename from text that preserves Spanish accents as Unicode code points
-    to maintain uniqueness between similar words with different accents.
-    """
-    # Base set of valid characters for filenames
+    """Create a valid filename from text"""
+    # Replace invalid characters
     valid_chars = "-_.() abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    
-    # Store special characters with their Unicode code points
-    special_chars = []
-    for i, char in enumerate(filename):
-        if char not in valid_chars:
-            # Store position and Unicode code point
-            special_chars.append((i, ord(char)))
-    
-    # Create a base sanitized name using only valid characters
-    base_name = ''.join(c for c in filename if c in valid_chars)
-    
-    # Replace spaces with underscores
-    base_name = base_name.replace(' ', '_')
-    
-    # If we had special characters, append their information to the filename
-    if special_chars:
-        # Create a suffix with position and code point information
-        # Format: _p1c233_p3c225 (position 1, code 233; position 3, code 225)
-        suffix = ""
-        for pos, code in special_chars:
-            suffix += f"_p{pos}c{code}"
-        
-        # Ensure we have room for the suffix (limit base name if needed)
-        max_base_length = 40  # Allow up to 10 characters for the suffix
-        if len(base_name) > max_base_length:
-            base_name = base_name[:max_base_length]
-        
-        result = base_name + suffix
-    else:
-        # No special characters, just limit length
-        result = base_name[:50]
-    
-    return result.strip()
+    sanitized = ''.join(c for c in filename if c in valid_chars)
+    # Limit length and trim
+    return sanitized[:30].strip()
 
 def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, output_file, media_dir):
     """Create an Anki deck with audio files and images"""
@@ -422,12 +381,12 @@ def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, 
                 'qfmt': '''
                 {{WordAudio}}
                 <div style="font-size: 28px; text-align: center; color: #2563eb; font-weight: bold; margin-bottom: 15px;">{{Spanish}}</div>
-                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;">{{Image}}</div>{{/Image}}
+                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;"><img src="{{Image}}" style="max-width: 300px; max-height: 300px;"></div>{{/Image}}
                 ''',
                 'afmt': '''
                 {{WordAudio}}
                 <div style="font-size: 28px; text-align: center; color: #2563eb; font-weight: bold; margin-bottom: 15px;">{{Spanish}}</div>
-                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;">{{Image}}</div>{{/Image}}
+                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;"><img src="{{Image}}" style="max-width: 300px; max-height: 300px;"></div>{{/Image}}
                 <hr id="answer">
                 <div style="font-size: 24px; text-align: center; color: #059669;">{{English}}</div>
                 {{#SpanishExample}}
@@ -448,7 +407,7 @@ def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, 
                 <hr id="answer">
                 {{WordAudio}}
                 <div style="font-size: 28px; text-align: center; color: #2563eb; font-weight: bold; margin-bottom: 15px;">{{Spanish}}</div>
-                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;">{{Image}}</div>{{/Image}}
+                {{#Image}}<div style="text-align: center; margin-top: 15px; margin-bottom: 15px;"><img src="{{Image}}" style="max-width: 300px; max-height: 300px;"></div>{{/Image}}
                 {{#SpanishExample}}
                 <div style="margin-top: 20px; font-size: 20px; text-align: center; color: #6366f1; font-style: italic;">
                     {{ExampleAudio}}{{SpanishExample}}
@@ -490,13 +449,11 @@ def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, 
     package.media_files = media_files
     
     # Add notes with audio and images
-    for data in data_rows:
-        spanish_word = data['spanish']
-        
+    for i, data in enumerate(data_rows):
         # Get audio filenames if they exist
-        word_audio = audio_files.get(spanish_word, '')
+        word_audio = audio_files.get(data['spanish'], '')
         example_audio = audio_files.get(data['spanish_example'], '')
-        image = image_files.get(spanish_word, '')
+        image = image_files.get(data['spanish'], '')
         
         # Format audio tags for Anki
         word_audio_tag = f'[sound:{word_audio}]' if word_audio else ''
@@ -506,13 +463,13 @@ def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, 
         note = genanki.Note(
             model=model,
             fields=[
-                spanish_word,
+                data['spanish'],
                 data['english'],
                 data['spanish_example'],
                 data['english_example'],
                 word_audio_tag,
                 example_audio_tag,
-                f'<img src="{image}" style="max-width: 300px; max-height: 300px;">'
+                image
             ]
         )
         
@@ -523,6 +480,7 @@ def create_anki_deck_with_audio_and_images(data_rows, audio_files, image_files, 
 
 if __name__ == '__main__':
     # Parse command line arguments
+    import random
     import argparse
     
     parser = argparse.ArgumentParser(description="Generate Spanish Audio & Image Flashcards")
@@ -570,7 +528,7 @@ if __name__ == '__main__':
     
     if not api_key and not args.local:
         # Try to get from environment variable
-        api_key = "" #your openai api key
+        api_key = os.environ.get("OPENAI_API_KEY")
         
         if not api_key:
             use_api = input("Use OpenAI for audio and image generation? (y/n): ").strip().lower() == 'y'
